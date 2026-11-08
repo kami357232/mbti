@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#4f46e5">
-<title>MBTI 人格小测试</title>
+<meta name="description" content="40 题的 MBTI 人格倾向小测试：4 个维度、16 种类型、分档判读与可信度校验，纯本地计算。">
+<title>MBTI 人格小测试 v2</title>
 <style>
   :root{
     --bg:#f5f6fa; --card:#ffffff; --ink:#1c1e26; --muted:#6b7280;
     --line:#e5e7eb; --accent:#4f46e5; --accent-soft:#eef2ff;
-    --good:#0f9d58; --warn:#d97706;
+    --good:#0f9d58; --warn:#d97706; --bad:#b91c1c;
   }
   @media (prefers-color-scheme: dark){
     :root{
@@ -34,7 +35,8 @@
   h2{font-size:17px;margin:22px 0 8px}
   p{margin:0 0 10px}
   .muted{color:var(--muted);font-size:14px}
-  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+  .small{font-size:12.5px}
+  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin:0 6px 6px 0}
   .btn{
     display:block;width:100%;border:1px solid var(--line);background:var(--card);
     color:var(--ink);font:inherit;font-size:16px;line-height:1.5;
@@ -44,13 +46,12 @@
   .btn:active{transform:scale(.985)}
   .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;text-align:center;font-weight:600}
   .btn.ghost{background:transparent;text-align:center;color:var(--muted);border-style:dashed;font-size:14px;padding:11px}
-  .btn.picked{background:var(--accent-soft);border-color:var(--accent)}
   .bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin:12px 0 18px}
   .bar > i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .25s ease}
   .q{font-size:19px;line-height:1.55;margin:4px 0 16px;font-weight:600}
   .type{font-size:44px;font-weight:800;letter-spacing:3px;margin:2px 0 4px;color:var(--accent)}
   .type-name{font-size:18px;font-weight:600;margin-bottom:10px}
-  .dim{margin:14px 0}
+  .dim{margin:16px 0}
   .dim .label{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:13.5px;margin-bottom:5px}
   .dim .label b{font-weight:700}
   .dim .desc{font-size:12px;color:var(--muted);text-align:center;margin-top:5px}
@@ -64,72 +65,173 @@
   ul.list li{margin:5px 0}
   .foot{color:var(--muted);font-size:12.5px;line-height:1.7;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
   .note{border-left:3px solid var(--warn);background:rgba(217,119,6,.08);padding:10px 12px;border-radius:8px;font-size:13.5px;margin:12px 0}
+  .note.bad{border-color:var(--bad);background:rgba(185,28,28,.08)}
+  .note.ok{border-color:var(--good);background:rgba(15,157,88,.08)}
   .row{display:flex;gap:10px}
   .row .btn{margin:10px 0 0}
-  .hidden{display:none}
+  details.adv{margin-top:14px;border:1px dashed var(--line);border-radius:12px;padding:0 12px}
+  details.adv summary{cursor:pointer;padding:11px 0;font-size:14px;color:var(--muted)}
+  details.adv .inner{padding-bottom:12px;font-size:14px}
+  .stack{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--accent-soft);padding:8px 10px;border-radius:8px;display:inline-block}
 </style>
 </head>
 <body>
 <div id="app"></div>
 
 <script>
-/* ============ 题库：四个维度，每个 7 题，共 28 题 ============ */
+/* ===================== 题库 =====================
+   40 题：每个维度 10 题，其中 3 题为反向计分（rev:true）。
+   反向题的作用：① 降低"一路选同一个位置"的惯性偏差；② 让直线作答可被识别。
+   选项 a / b 只描述行为，不出现维度术语。
+================================================== */
 const QUESTIONS = [
-  // E / I  能量来源
-  {axis:"EI", q:"周末突然空出半天，你更想……", a:{t:"约人出门，找朋友聊聊天", v:"E"}, b:{t:"一个人待着，做点自己的事", v:"I"}},
-  {axis:"EI", q:"在一场基本都是陌生人的聚会上，你通常……", a:{t:"主动和几个人搭话", v:"E"}, b:{t:"先观察，等别人来找你", v:"I"}},
-  {axis:"EI", q:"想把一件事想清楚时，你更常……", a:{t:"边说边想，说出来才理顺", v:"E"}, b:{t:"先在心里想明白，再开口", v:"I"}},
-  {axis:"EI", q:"连续社交一整天后，你的感觉是……", a:{t:"还挺兴奋，能继续", v:"E"}, b:{t:"明显被掏空，需要独处充电", v:"I"}},
-  {axis:"EI", q:"遇到烦心事，你更倾向于……", a:{t:"找人说出来", v:"E"}, b:{t:"自己先消化", v:"I"}},
-  {axis:"EI", q:"你的社交圈更接近……", a:{t:"认识的人多，圈子比较广", v:"E"}, b:{t:"少数几个很熟，交往很深", v:"I"}},
-  {axis:"EI", q:"在小组讨论里，你更常……", a:{t:"主动开口，推动话题往前走", v:"E"}, b:{t:"听得多，想清楚再发言", v:"I"}},
+  // ---------- E / I（10 题，含 3 道反向）----------
+  {axis:"EI", rev:false, q:"周末突然空出半天，你第一反应是……", a:"约人出门，找朋友聊聊天", b:"一个人待着，做点自己的事"},
+  {axis:"EI", rev:false, q:"在一个基本都是陌生人的场合，你通常……", a:"主动和几个人搭话", b:"先观察，等别人来找你"},
+  {axis:"EI", rev:false, q:"想把一件事想清楚时，你更常……", a:"边说边想，说出来才理顺", b:"先在心里想明白，再开口"},
+  {axis:"EI", rev:false, q:"连续社交一整天后，你的感觉是……", a:"还挺兴奋，能继续", b:"明显被掏空，需要独处充电"},
+  {axis:"EI", rev:false, q:"遇到烦心事，你更倾向于……", a:"找人说出来", b:"自己先消化"},
+  {axis:"EI", rev:false, q:"你的社交圈更接近……", a:"认识的人多，圈子比较广", b:"少数几个很熟，交往很深"},
+  {axis:"EI", rev:false, q:"在小组讨论里，你更常……", a:"主动开口，推动话题往前走", b:"听得多，想清楚再发言"},
+  {axis:"EI", rev:true,  q:"一个新的聚餐邀约，你更常见的反应是……", a:"先想想要不要推掉，人多会累", b:"先答应下来，到时候再调整状态"},
+  {axis:"EI", rev:true,  q:"别人临时打电话来聊事情，你的第一感受是……", a:"有点被打断，希望改成文字", b:"挺好，正好聊聊"},
+  {axis:"EI", rev:true,  q:"需要专注做事时，你更喜欢……", a:"一个人安静的环境", b:"有人在场，哪怕各干各的"},
 
-  // S / N  信息获取
-  {axis:"SN", q:"学一样新东西时，你更信任……", a:{t:"具体例子和可以照做的步骤", v:"S"}, b:{t:"背后的原理和整体框架", v:"N"}},
-  {axis:"SN", q:"进入一个新环境，你更容易注意到……", a:{t:"眼前的事实和细节", v:"S"}, b:{t:"事情之间的关联和可能性", v:"N"}},
-  {axis:"SN", q:"讲一次旅行，你更爱讲……", a:{t:"去了哪、吃了什么、花了多少", v:"S"}, b:{t:"感受、联想，和这次旅行对我的意义", v:"N"}},
-  {axis:"SN", q:"做计划时，你更看重……", a:{t:"现在就能落地的具体步骤", v:"S"}, b:{t:"未来可能的方向和空间", v:"N"}},
-  {axis:"SN", q:"别人更常这样评价你……", a:{t:"实在、靠得住", v:"S"}, b:{t:"想得多、有想法", v:"N"}},
-  {axis:"SN", q:"你更享受哪种过程……", a:{t:"把已经有的东西打磨得更精细", v:"S"}, b:{t:"想出一个还没人做过的点子", v:"N"}},
-  {axis:"SN", q:"拿到一份说明书，你会……", a:{t:"按步骤一步步照着做", v:"S"}, b:{t:"先跳着翻，抓住大意再回头", v:"N"}},
+  // ---------- S / N（10 题，含 3 道反向）----------
+  {axis:"SN", rev:false, q:"学一样新东西时，你更信任……", a:"具体例子和可以照做的步骤", b:"背后的原理和整体框架"},
+  {axis:"SN", rev:false, q:"进入一个新环境，你更容易注意到……", a:"眼前的事实和细节", b:"事情之间的关联和可能性"},
+  {axis:"SN", rev:false, q:"讲一次旅行，你更爱讲……", a:"去了哪、吃了什么、花了多少", b:"感受、联想，和这次旅行的意义"},
+  {axis:"SN", rev:false, q:"做计划时，你更看重……", a:"现在就能落地的具体步骤", b:"未来可能的方向和空间"},
+  {axis:"SN", rev:false, q:"拿到一份新的软件说明书，你会……", a:"按步骤一步步照着做", b:"先跳着翻，抓住大意再回头"},
+  {axis:"SN", rev:false, q:"你更享受哪种过程……", a:"把已经有的东西打磨得更精细", b:"想出一个还没人做过的点子"},
+  {axis:"SN", rev:false, q:"别人更常这样评价你……", a:"实在、靠得住", b:"想得多、有想法"},
+  {axis:"SN", rev:true,  q:"聊天时，你更常被对方说……", a:"话题跳得太快，跟不上", b:"太抠细节，别绕弯子"},
+  {axis:"SN", rev:true,  q:"接手一件事时，你更自然的做法是……", a:"先想它还能变成什么样子", b:"先弄清它现在到底是怎么运作的"},
+  {axis:"SN", rev:true,  q:"回忆过去的事，你脑子里更常浮现……", a:"当时的画面和具体场景", b:"后来才想明白的意义"},
 
-  // T / F  决策方式
-  {axis:"TF", q:"朋友向你抱怨时，你第一反应是……", a:{t:"帮他分析该怎么解决", v:"T"}, b:{t:"先说一句“确实挺难受的”", v:"F"}},
-  {axis:"TF", q:"做决定时，你更依赖……", a:{t:"逻辑和利弊得失", v:"T"}, b:{t:"自己的感受和对别人的影响", v:"F"}},
-  {axis:"TF", q:"别人当面指出你的问题，你更在意……", a:{t:"他说得对不对", v:"T"}, b:{t:"他说话的方式和态度", v:"F"}},
-  {axis:"TF", q:"团队里有人拖了后腿，你更可能……", a:{t:"直接把问题指出来", v:"T"}, b:{t:"先想他是不是遇到了什么困难", v:"F"}},
-  {axis:"TF", q:"你更希望被人评价为……", a:{t:"公平、讲原则", v:"T"}, b:{t:"温暖、好相处", v:"F"}},
-  {axis:"TF", q:"看电影时，你更容易被打动的是……", a:{t:"情节严密、逻辑站得住", v:"T"}, b:{t:"人物真挚的情感", v:"F"}},
-  {axis:"TF", q:"必须拒绝别人时，你觉得……", a:{t:"把理由说清楚就够了", v:"T"}, b:{t:"用什么方式说更重要", v:"F"}},
+  // ---------- T / F（10 题，含 3 道反向）----------
+  {axis:"TF", rev:false, q:"朋友向你抱怨时，你第一反应是……", a:"帮他分析该怎么解决", b:"先说一句“确实挺难受的”"},
+  {axis:"TF", rev:false, q:"做决定时，你更依赖……", a:"逻辑和利弊得失", b:"自己的感受和对别人的影响"},
+  {axis:"TF", rev:false, q:"别人当面指出你的问题，你更在意……", a:"他说得对不对", b:"他说话的方式和态度"},
+  {axis:"TF", rev:false, q:"朋友提出一个明显有漏洞的方案，你会……", a:"当场把问题指出来", b:"先说“挺好的”，再私下提醒"},
+  {axis:"TF", rev:false, q:"你更希望被人评价为……", a:"公平、讲原则", b:"温暖、好相处"},
+  {axis:"TF", rev:false, q:"看电影时，你更容易被打动的是……", a:"情节严密、逻辑站得住", b:"人物真挚的情感"},
+  {axis:"TF", rev:false, q:"必须拒绝别人时，你觉得……", a:"把理由说清楚就够了", b:"用什么方式说更重要"},
+  {axis:"TF", rev:true,  q:"团队里要淘汰一个能力不足的成员，你更在意……", a:"他家里的情况，能不能再给次机会", b:"规则是否被公平执行"},
+  {axis:"TF", rev:true,  q:"看一场争论，你更先注意到……", a:"两边的情绪有没有被照顾到", b:"谁的论证有漏洞"},
+  {axis:"TF", rev:true,  q:"给别人提意见时，你更常先想……", a:"这话说出去他会不会难受", b:"这话是不是事实、有没有用"},
 
-  // J / P  生活态度
-  {axis:"JP", q:"出门旅行前，你……", a:{t:"会做好详细行程和清单", v:"J"}, b:{t:"大致定个方向就出发", v:"P"}},
-  {axis:"JP", q:"你的桌面和文件……", a:{t:"分类清楚，随时能找到", v:"J"}, b:{t:"有点乱，但我知道东西在哪", v:"P"}},
-  {axis:"JP", q:"面对截止日期，你通常……", a:{t:"提前完成，留出余量", v:"J"}, b:{t:"临近了效率最高", v:"P"}},
-  {axis:"JP", q:"计划被临时打乱，你会……", a:{t:"有点烦躁，想尽快回到计划里", v:"J"}, b:{t:"无所谓，随机应变反而有意思", v:"P"}},
-  {axis:"JP", q:"你更喜欢……", a:{t:"事情有明确的结论", v:"J"}, b:{t:"保留选择的余地", v:"P"}},
-  {axis:"JP", q:"关于待办清单，你……", a:{t:"会写，而且真的会划掉", v:"J"}, b:{t:"写过，但很少回头看", v:"P"}},
-  {axis:"JP", q:"你的做事节奏更像……", a:{t:"稳步推进，按部就班", v:"J"}, b:{t:"一阵一阵，集中爆发", v:"P"}},
+  // ---------- J / P（10 题，含 3 道反向）----------
+  {axis:"JP", rev:false, q:"出门旅行前，你……", a:"会做好详细行程和清单", b:"大致定个方向就出发"},
+  {axis:"JP", rev:false, q:"你的桌面和文件……", a:"分类清楚，随时能找到", b:"有点乱，但我知道东西在哪"},
+  {axis:"JP", rev:false, q:"面对截止日期，你通常……", a:"提前完成，留出余量", b:"临近了效率最高"},
+  {axis:"JP", rev:false, q:"计划被临时打乱，你会……", a:"有点烦躁，想尽快回到计划里", b:"无所谓，随机应变反而有意思"},
+  {axis:"JP", rev:false, q:"你更喜欢……", a:"事情有明确的结论", b:"保留选择的余地"},
+  {axis:"JP", rev:false, q:"关于待办清单，你……", a:"会写，而且真的会划掉", b:"写过，但很少回头看"},
+  {axis:"JP", rev:false, q:"你的做事节奏更像……", a:"稳步推进，按部就班", b:"一阵一阵，集中爆发"},
+  {axis:"JP", rev:true,  q:"一件还没定下来的事，你会……", a:"放着，等它自己清楚", b:"尽量先定个方向，不然不踏实"},
+  {axis:"JP", rev:true,  q:"别人夸你做事，更可能是因为……", a:"临场能变通、不慌", b:"按计划推进、不掉链子"},
+  {axis:"JP", rev:true,  q:"你更容易被哪种状态吸引……", a:"说走就走，不用安排", b:"一切都安排妥当，心里有底"},
 ];
 
-/* ============ 16 型描述 ============ */
+/* ===================== 16 型内容 ===================== */
 const TYPES = {
-  ISTJ:{n:"物流师",s:"可靠、务实、说到做到",g:["责任心和执行力强","重视规则与细节，少出错","承诺的事情一定跟进到底"],b:["变化太快时容易僵住","不太表达情绪，容易被误解为冷淡","容易把“应该”压在别人身上"],f:["财务 / 审计 / 法务","运维 / 质量 / 项目管理","行政与流程类岗位"]},
-  ISFJ:{n:"守卫者",s:"体贴、细心，默默把事做好",g:["观察入微，记得别人的需要","踏实可靠，团队里的稳定器","对承诺和关系都很忠诚"],b:["不容易拒绝，容易过度承担","面对冲突倾向忍让","变化来临时容易焦虑"],f:["教育 / 护理 / 医疗支持","人事 / 客户成功","行政与后勤保障"]},
-  INFJ:{n:"提倡者",s:"理想主义，能看穿人心",g:["洞察力强，能读懂言外之意","有长期目标感和使命感","擅长一对一深度沟通"],b:["容易过度思虑、内耗","对现实妥协感到痛苦","标准高，容易对他人失望"],f:["心理咨询 / 教练","内容策划 / 品牌","公益与社会创新"]},
-  INTJ:{n:"建筑师",s:"目标清晰，习惯从系统层面想问题",g:["战略眼光，能提前布局","独立、自驱，不需要人催","学习能力强，抓住本质快"],b:["显得疏离，不喜欢无效应酬","对低效容忍度低","容易忽略他人的情绪需要"],f:["技术架构 / 算法 / 研发","战略与商业分析","产品规划"]},
-  ISTP:{n:"鉴赏家",s:"冷静、动手能力强，专治眼前的问题",g:["上手快，能快速定位故障","压力下依然冷静","不喜欢废话，效率高"],b:["对长期规划兴趣不足","不爱解释，容易显得冷淡","容易厌倦重复性工作"],f:["工程 / 硬件 / 现场调试","安全应急 / 逆向分析","运维与技术支持"]},
-  ISFP:{n:"探险家",s:"温和、有审美，活在当下",g:["细腻敏感，能感知氛围","动手与审美结合得好","不强加于人，相处舒服"],b:["不喜欢冲突，容易回避","长期目标容易模糊","被批评时容易受伤"],f:["设计 / 摄影 / 视觉","手作 / 内容创作","服务与体验类岗位"]},
-  INFP:{n:"调停者",s:"真诚、理想主义，在意“这件事对不对”",g:["共情力强，能理解复杂情绪","有创造力，善于表达内心","坚持自己认同的价值"],b:["容易拖延，理想与现实拉扯","对批评敏感","做决定时反复摇摆"],f:["写作 / 内容 / 编剧","心理咨询 / 教育","用户研究 / 公益"]},
-  INTP:{n:"逻辑学家",s:"好奇、爱分析，喜欢把事情拆开研究",g:["抽象思维强，善于建模","独立，不轻易被说服","对感兴趣的东西钻研很深"],b:["想得多做得少，容易半途","对规则和流程不耐烦","容易忽略现实约束"],f:["研发 / 算法 / 数据","研究 / 学术","技术写作与咨询"]},
-  ESTP:{n:"企业家",s:"果断、行动快，喜欢真实世界的挑战",g:["临场反应快，敢拍板","擅长谈判和现场解决问题","抗压、不怕试错"],b:["耐心不足，容易急躁","对长期后果考虑偏少","不爱做计划"],f:["销售 / 商务拓展","创业 / 运营","应急与现场管理"]},
-  ESFP:{n:"表演者",s:"热情、有感染力，能把气氛带动起来",g:["亲和力强，容易建立关系","适应快，现场感好","让团队气氛轻松"],b:["容易冲动消费或决定","不喜欢枯燥的收尾工作","长期规划较弱"],f:["市场 / 活动 / 新媒体","销售 / 客户关系","表演 / 直播 / 内容"]},
-  ENFP:{n:"竞选者",s:"点子多、能量足，擅长把人和事连起来",g:["创意和热情都很充沛","共情力强，社交自然","能给团队带来新可能"],b:["容易开很多头、收不住尾","对重复任务耐心低","承诺过多容易疲惫"],f:["市场 / 品牌 / 增长","内容与社群运营","产品与用户研究"]},
-  ENTP:{n:"辩论家",s:"思维机敏，喜欢挑战既有说法",g:["反应快，善于找漏洞","点子多，敢于打破常规","跨界学习能力强"],b:["容易争论过度、显得尖锐","对执行细节不耐烦","喜欢开头不喜欢收尾"],f:["产品 / 增长 / 战略","咨询 / 商业分析","创业与技术布道"]},
-  ESTJ:{n:"总经理",s:"组织力强，把目标拆成一步步的动作",g:["执行和统筹能力强","决策果断，能扛事","擅长建立流程和标准"],b:["容易强势，听不进不同意见","对情绪需求不敏感","不喜变化和无序"],f:["管理 / 项目管理","运营 / 供应链","销售团队管理"]},
-  ESFJ:{n:"执政官",s:"热心、会照顾人，天生维护关系",g:["善于协调，让团队融洽","对他人需求很敏感","执行力强，说到做到"],b:["太在意别人评价","容易为关系牺牲原则","不喜欢冲突和变动"],f:["人事 / 行政 / 客户成功","教育 / 医疗服务","社群与活动运营"]},
-  ENFJ:{n:"主人公",s:"有号召力，擅长带动他人成长",g:["共情与表达兼具，感染力强","善于识人、鼓励人","有推动团队向前的能量"],b:["容易替别人扛太多","对负面反馈较敏感","理想化，容易失望"],f:["管理 / 团队负责人","培训 / 教育 / 教练","品牌公关 / 人力发展"]},
-  ENTJ:{n:"指挥官",s:"目标导向，天然想把事情推到底",g:["统筹与决断力强","擅长定目标、调动资源","抗压，能在混乱中推进"],b:["节奏快，容易压到身边人","对情绪和关系投入不足","不容易接受“做不到”"],f:["创业 / 高管 / 战略","咨询 / 投资","大型项目负责"]},
+  ISTJ:{n:"物流师",s:"可靠、务实、说到做到",stack:"Si–Te–Fi–Ne",
+    g:["责任心和执行力强","重视规则与细节，很少出错","答应的事一定跟进到底"],
+    b:["变化太快时容易僵住","不太表达情绪，容易被看成冷淡","容易把自己认定的“应该”压给别人"],
+    stress:"压力大时会变得格外固执，抓住旧办法不放，还会突然对细节吹毛求疵。",
+    misread:"被说“死板”，其实只是先要弄清规则才肯动；规则清楚了反而很灵活。",
+    c:["财务 / 审计 / 法务","运维 / 质量 / 项目管理","行政与流程类岗位"]},
+  ISFJ:{n:"守卫者",s:"体贴、细心，默默把事做好",stack:"Si–Fe–Ti–Ne",
+    g:["观察入微，记得别人的需要","踏实可靠，是团队里的稳定器","对承诺和关系都很忠诚"],
+    b:["不容易拒绝，容易过度承担","面对冲突倾向忍让","变化来临时容易焦虑"],
+    stress:"压力大时会突然开始灾难化想象，把最坏的结果反复在脑子里过一遍。",
+    misread:"被说“没主见”，其实是不想让场面难堪；真触到底线时非常坚定。",
+    c:["教育 / 护理 / 医疗支持","人事 / 客户成功","行政与后勤保障"]},
+  INFJ:{n:"提倡者",s:"理想主义，能看穿人心",stack:"Ni–Fe–Ti–Se",
+    g:["洞察力强，能读出言外之意","有长期目标感和使命感","擅长一对一的深度沟通"],
+    b:["容易过度思虑、内耗","对现实妥协感到痛苦","标准高，容易对他人失望"],
+    stress:"压力大时会突然变得挑剔又疏离，用尖锐的评判把身边人推开。",
+    misread:"被说“想太多”，其实是把很多信息一次都接收进来了，只是没说出口。",
+    c:["心理咨询 / 教练","内容策划 / 品牌","公益与社会创新"]},
+  INTJ:{n:"建筑师",s:"目标清晰，习惯从系统层面想问题",stack:"Ni–Te–Fi–Se",
+    g:["战略眼光，能提前布局","独立、自驱，不需要人催","学习能力强，很快抓住本质"],
+    b:["显得疏离，不喜欢无效应酬","对低效率容忍度低","容易忽略他人的情绪需要"],
+    stress:"压力大时会突然沉溺于感官刺激——暴食、刷视频、疯狂购物，和平时的克制反差很大。",
+    misread:"被说“冷漠”，其实是懒得解释过程；在意的事会默默做到极致。",
+    c:["技术架构 / 算法 / 研发","战略与商业分析","产品规划"]},
+  ISTP:{n:"鉴赏家",s:"冷静、动手能力强，专治眼前的问题",stack:"Ti–Se–Ni–Fe",
+    g:["上手快，能迅速定位故障","压力下依然冷静","不喜欢废话，效率高"],
+    b:["对长期规划兴趣不足","不爱解释，容易显得冷淡","容易厌倦重复性工作"],
+    stress:"压力大时会情绪化爆发，平时不说的话一次全倒出来，事后自己也吓一跳。",
+    misread:"被说“不上心”，其实只是在心里跑完了整个流程，觉得没必要说。",
+    c:["工程 / 硬件 / 现场调试","安全应急 / 逆向分析","运维与技术支持"]},
+  ISFP:{n:"探险家",s:"温和、有审美，活在当下",stack:"Fi–Se–Ni–Te",
+    g:["细腻敏感，能感知氛围","动手与审美结合得好","不强加于人，相处舒服"],
+    b:["不喜欢冲突，容易回避","长期目标容易模糊","被批评时容易受伤"],
+    stress:"压力大时会突然用极度批判的眼光否定一切，包括自己。",
+    misread:"被说“没想法”，其实是把想法放在作品里了，而不是嘴上。",
+    c:["设计 / 摄影 / 视觉","手作 / 内容创作","服务与体验类岗位"]},
+  INFP:{n:"调停者",s:"真诚、理想主义，在意“这件事对不对”",stack:"Fi–Ne–Si–Te",
+    g:["共情力强，能理解复杂的情绪","有创造力，善于表达内心","坚持自己认同的价值"],
+    b:["容易拖延，理想与现实拉扯","对批评敏感","做决定时反复摇摆"],
+    stress:"压力大时会突然变得异常苛刻，用挑错来保护自己。",
+    misread:"被说“玻璃心”，其实只是对“对不对”很敏感，不是对“赢没赢”。",
+    c:["写作 / 内容 / 编剧","心理咨询 / 教育","用户研究 / 公益"]},
+  INTP:{n:"逻辑学家",s:"好奇、爱分析，喜欢把事情拆开研究",stack:"Ti–Ne–Si–Fe",
+    g:["抽象思维强，善于建模","独立，不轻易被说服","对感兴趣的东西钻研很深"],
+    b:["想得多做得少，容易半途","对规则和流程不耐烦","容易忽略现实约束"],
+    stress:"压力大时会突然情绪失控或过度在意别人的看法，和平时判若两人。",
+    misread:"被说“抬杠”，其实只是想把概念抠准，输赢并不重要。",
+    c:["研发 / 算法 / 数据","研究 / 学术","技术写作与咨询"]},
+  ESTP:{n:"企业家",s:"果断、行动快，喜欢真实世界的挑战",stack:"Se–Ti–Fe–Ni",
+    g:["临场反应快，敢拍板","擅长谈判和现场解决问题","抗压、不怕试错"],
+    b:["耐心不足，容易急躁","对长期后果考虑偏少","不爱做计划"],
+    stress:"压力大时会突然被「如果以后怎么办」的念头困住，陷入平时最不屑的焦虑。",
+    misread:"被说“莽撞”，其实是信息到手就先试一下，比空想快。",
+    c:["销售 / 商务拓展","创业 / 运营","应急与现场管理"]},
+  ESFP:{n:"表演者",s:"热情、有感染力，能把气氛带动起来",stack:"Se–Fi–Te–Ni",
+    g:["亲和力强，容易建立关系","适应快，现场感好","能让团队气氛轻松"],
+    b:["容易冲动消费或决定","不喜欢枯燥的收尾工作","长期规划较弱"],
+    stress:"压力大时会突然变得悲观又挑剔，开始否定自己过去的选择。",
+    misread:"被说“不靠谱”，其实只是不愿意把热情浪费在没意义的事上。",
+    c:["市场 / 活动 / 新媒体","销售 / 客户关系","表演 / 直播 / 内容"]},
+  ENFP:{n:"竞选者",s:"点子多、能量足，擅长把人和事连起来",stack:"Ne–Fi–Te–Si",
+    g:["创意和热情都很充沛","共情力强，社交自然","能给团队带来新可能"],
+    b:["容易开很多头、收不住尾","对重复任务耐心低","承诺过多容易疲惫"],
+    stress:"压力大时会突然被细节和琐事压垮，开始怀疑自己做的所有事。",
+    misread:"被说“三分钟热度”，其实只是同时开着很多扇门，真正的兴趣会一直留着。",
+    c:["市场 / 品牌 / 增长","内容与社群运营","产品与用户研究"]},
+  ENTP:{n:"辩论家",s:"思维机敏，喜欢挑战既有说法",stack:"Ne–Ti–Fe–Si",
+    g:["反应快，善于找漏洞","点子多，敢于打破常规","跨界学习能力强"],
+    b:["容易争论过度、显得尖锐","对执行细节不耐烦","喜欢开头不喜欢收尾"],
+    stress:"压力大时会突然抓住细节反复检查，陷入平时最烦的琐碎里。",
+    misread:"被说“爱抬杠”，其实是在帮对方把想法试压一遍。",
+    c:["产品 / 增长 / 战略","咨询 / 商业分析","创业与技术布道"]},
+  ESTJ:{n:"总经理",s:"组织力强，把目标拆成一步步的动作",stack:"Te–Si–Ne–Fi",
+    g:["执行和统筹能力强","决策果断，能扛事","擅长建立流程和标准"],
+    b:["容易强势，听不进不同意见","对情绪需求不敏感","不喜变化和无序"],
+    stress:"压力大时会突然情绪化、变得异常敏感，平时不说的委屈一次涌出来。",
+    misread:"被说“控制欲强”，其实只是受不了事情没着落。",
+    c:["管理 / 项目管理","运营 / 供应链","销售团队管理"]},
+  ESFJ:{n:"执政官",s:"热心、会照顾人，天生维护关系",stack:"Fe–Si–Ne–Ti",
+    g:["善于协调，让团队融洽","对他人需求很敏感","执行力强，说到做到"],
+    b:["太在意别人评价","容易为关系牺牲原则","不喜欢冲突和变动"],
+    stress:"压力大时会突然变得冷淡刻薄，用一种「我不管了」的方式保护自己。",
+    misread:"被说“讨好”，其实是把关系的顺畅当成做事的必要条件。",
+    c:["人事 / 行政 / 客户成功","教育 / 医疗服务","社群与活动运营"]},
+  ENFJ:{n:"主人公",s:"有号召力，擅长带动他人成长",stack:"Fe–Ni–Se–Ti",
+    g:["共情与表达兼具，感染力强","善于识人、鼓励人","有推动团队向前的能量"],
+    b:["容易替别人扛太多","对负面反馈较敏感","理想化，容易失望"],
+    stress:"压力大时会突然钻牛角尖，用逻辑把自己和身边人都拆解一遍。",
+    misread:"被说“爱管闲事”，其实是本能地看见别人卡在哪。",
+    c:["管理 / 团队负责人","培训 / 教育 / 教练","品牌公关 / 人力发展"]},
+  ENTJ:{n:"指挥官",s:"目标导向，天然想把事情推到底",stack:"Te–Ni–Se–Fi",
+    g:["统筹与决断力强","擅长定目标、调动资源","抗压，能在混乱中推进"],
+    b:["节奏快，容易压到身边人","对情绪和关系投入不足","不容易接受“做不到”"],
+    stress:"压力大时会突然被内心的价值问题困住，开始质疑自己争的这些到底为了什么。",
+    misread:"被说“强势”，其实只是把目标说清楚了，并不是不允许别人反对。",
+    c:["创业 / 高管 / 战略","咨询 / 投资","大型项目负责"]},
 };
 
 const DIMS = [
@@ -139,141 +241,278 @@ const DIMS = [
   {key:"JP", l:"J", r:"P", ln:"判断", rn:"知觉", desc:"怎么安排生活"},
 ];
 
-/* ============ 计分（纯函数，便于测试） ============ */
-function compute(answers){
-  const counts = {EI:{E:0,I:0},SN:{S:0,N:0},TF:{T:0,F:0},JP:{J:0,P:0}};
-  let skipped = 0;
-  answers.forEach((v, i) => {
-    const q = QUESTIONS[i];
-    if(!v){ skipped++; return; }
-    counts[q.axis][v] += 1;
-  });
-  let code = "", axes = [];
-  DIMS.forEach(d => {
+const SAVE_KEY = "mbti_progress_v2";
+
+/* ===================== 计分 ===================== */
+function shuffle(arr, rnd){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* 打乱题目顺序，并尽量避免同一维度连续出现 3 次以上 */
+function buildOrder(rnd = Math.random){
+  const idx = QUESTIONS.map((_, i) => i);
+  for (let attempt = 0; attempt < 40; attempt++){
+    const order = shuffle(idx, rnd);
+    let ok = true, run = 1;
+    for (let i = 1; i < order.length; i++){
+      run = QUESTIONS[order[i]].axis === QUESTIONS[order[i - 1]].axis ? run + 1 : 1;
+      if (run >= 3){ ok = false; break; }
+    }
+    if (ok) return order;
+  }
+  return shuffle(idx, rnd);
+}
+
+/* records: [{axis, rev, choice}]  choice ∈ 'a' | 'b' | 'n' */
+function compute(records){
+  const counts = {EI:{E:0,I:0}, SN:{S:0,N:0}, TF:{T:0,F:0}, JP:{J:0,P:0}};
+  const stat = {total:0, neutral:0, a:0, b:0};
+  for (const q of records){
+    const d = DIMS.find(x => x.key === q.axis);
+    stat.total++;
+    if (!q.choice || q.choice === "n"){
+      stat.neutral++;
+      counts[q.axis][d.l] += 0.5;
+      counts[q.axis][d.r] += 0.5;
+      continue;
+    }
+    const pickedLeft = (q.choice === "a") !== Boolean(q.rev);
+    counts[q.axis][pickedLeft ? d.l : d.r] += 1;
+    if (q.choice === "a") stat.a++; else stat.b++;
+  }
+
+  let code = "";
+  const axes = [];
+  for (const d of DIMS){
     const c = counts[d.key];
-    const lv = c[d.l], rv = c[d.r], total = lv + rv;
-    const pct = total ? Math.round((lv / total) * 100) : 50;
-    const letter = total ? (lv >= rv ? d.l : d.r) : d.l;
+    const total = c[d.l] + c[d.r];
+    const leftPct = total ? Math.round((c[d.l] / total) * 100) : 50;
+    const diff = Math.abs(leftPct - 50);
+    const band = diff < 10 ? "middle" : diff < 30 ? "lean" : "clear";
+    const letter = c[d.l] >= c[d.r] ? d.l : d.r;
     code += letter;
     axes.push({
       key:d.key, desc:d.desc, left:d.ln, right:d.rn,
       leftLetter:d.l, rightLetter:d.r,
-      leftPct: pct, rightPct: 100 - pct,
-      pick: letter, total,
-      borderline: total >= 5 && Math.abs(pct - 50) <= 7,
+      leftPct, rightPct: 100 - leftPct,
+      pick: letter, band, total,
     });
-  });
-  return {code, axes, skipped, answered: answers.filter(Boolean).length};
+  }
+
+  const answered = stat.a + stat.b;
+  const straight = answered ? Math.max(stat.a, stat.b) / answered : 0;
+  const confidence =
+    (stat.neutral / stat.total > 0.3 || straight > 0.9) ? "low" :
+    (stat.neutral / stat.total > 0.15 || straight > 0.8) ? "medium" : "high";
+
+  return {code, axes, stat, straight, confidence};
 }
 
-/* ============ 界面 ============ */
+/* ===================== 状态 ===================== */
 const app = document.getElementById("app");
-const state = { i:0, answers:new Array(QUESTIONS.length).fill(null), view:"intro" };
+const state = { order: buildOrder(), pos: 0, answers: [], startedAt: Date.now(), view: "intro" };
 
-function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function esc(s){
+  return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+}
+function save(){
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      order: state.order, pos: state.pos, answers: state.answers, startedAt: state.startedAt,
+    }));
+  } catch (e) { /* 隐私模式等情况忽略 */ }
+}
+function loadSave(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!Array.isArray(s.order) || s.order.length !== QUESTIONS.length) return null;
+    if (typeof s.pos !== "number" || s.pos <= 0 || s.pos >= QUESTIONS.length) return null;
+    return s;
+  } catch (e) { return null; }
+}
+function clearSave(){ try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
 
+function records(){
+  return state.order.map((qi, i) => ({
+    axis: QUESTIONS[qi].axis, rev: QUESTIONS[qi].rev,
+    choice: state.answers[i] || null,
+  }));
+}
+
+/* ===================== 视图 ===================== */
 function renderIntro(){
-  const total = QUESTIONS.length;
+  const saved = loadSave();
   app.innerHTML = `
     <div class="card">
       <h1>MBTI 人格小测试</h1>
-      <p class="muted">${total} 道题，约 4 分钟。凭第一反应选，不要纠结“哪个更好”。</p>
+      <p class="muted">${QUESTIONS.length} 道题，约 5 分钟。凭第一反应选，不要纠结“哪个更好”。</p>
       <p style="margin-top:14px">
-        <span class="tag">4 个维度</span><span class="tag">16 种类型</span><span class="tag">纯本地计算</span>
+        <span class="tag">4 个维度</span><span class="tag">16 种类型</span><span class="tag">含反向题</span><span class="tag">纯本地计算</span>
       </p>
-      <p class="muted" style="margin-top:12px">所有作答只存在你自己的手机浏览器里，不会上传到任何服务器。</p>
-      <button class="btn primary" id="start">开始测试</button>
+      <p class="muted small" style="margin-top:10px">
+        题目每次随机排序；有 ${QUESTIONS.filter(q => q.rev).length} 道是反向表述，用来抵消答题惯性。
+        所有作答只存在你自己的浏览器里，不会上传。
+      </p>
+      ${saved ? `<button class="btn primary" id="resume">继续上次（第 ${saved.pos + 1} 题）</button>
+                 <button class="btn" id="fresh">重新开始</button>`
+              : `<button class="btn primary" id="start">开始测试</button>`}
       <div class="foot">
-        本测试基于四个维度的自我报告，结果用于自我了解与交流参考，<b>不是心理诊断，也不该用来给人贴标签</b>。
+        本测试基于自我报告，结果用于自我了解与交流参考，<b>不是心理诊断，也不适合作为招聘或筛选依据</b>。
         同一个人在不同情境、不同时期的结果可能不同。
       </div>
     </div>`;
-  document.getElementById("start").onclick = () => { state.i = 0; state.view = "quiz"; renderQuiz(); };
+
+  const start = () => {
+    state.order = buildOrder();
+    state.pos = 0; state.answers = []; state.startedAt = Date.now();
+    state.view = "quiz"; save(); renderQuiz();
+  };
+  const el = id => document.getElementById(id);
+  if (saved && el("resume")){
+    el("resume").onclick = () => {
+      Object.assign(state, { order: saved.order, pos: saved.pos, answers: saved.answers, startedAt: saved.startedAt });
+      state.view = "quiz"; renderQuiz();
+    };
+    el("fresh").onclick = start;
+  } else if (el("start")){
+    el("start").onclick = start;
+  }
 }
 
 function renderQuiz(){
-  const q = QUESTIONS[state.i];
-  const chosen = state.answers[state.i];
-  const pct = Math.round((state.i / QUESTIONS.length) * 100);
+  const qi = state.order[state.pos];
+  const q = QUESTIONS[qi];
+  const chosen = state.answers[state.pos];
+  const pct = Math.round((state.pos / QUESTIONS.length) * 100);
+
   app.innerHTML = `
     <div class="card">
-      <div class="muted" style="display:flex;justify-content:space-between">
-        <span>第 ${state.i + 1} / ${QUESTIONS.length} 题</span><span>${DIMS.find(d=>d.key===q.axis).desc}</span>
+      <div class="muted small" style="display:flex;justify-content:space-between">
+        <span>第 ${state.pos + 1} / ${QUESTIONS.length} 题</span>
+        <span>${DIMS.find(d => d.key === q.axis).desc}</span>
       </div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       <div class="q">${esc(q.q)}</div>
-      <button class="btn ${chosen===q.a.v?'picked':''}" data-v="${q.a.v}">${esc(q.a.t)}</button>
-      <button class="btn ${chosen===q.b.v?'picked':''}" data-v="${q.b.v}">${esc(q.b.t)}</button>
-      <button class="btn ghost" data-v="">两个都不像，跳过</button>
-      ${state.i > 0 ? '<button class="btn ghost" id="back">← 上一题</button>' : ''}
+      <button class="btn" data-v="a" aria-pressed="${chosen === "a"}">${esc(q.a)}</button>
+      <button class="btn" data-v="b" aria-pressed="${chosen === "b"}">${esc(q.b)}</button>
+      <button class="btn ghost" data-v="n">两个都不像，跳过</button>
+      ${state.pos > 0 ? '<button class="btn ghost" id="back">← 上一题</button>' : ''}
     </div>`;
+
   app.querySelectorAll("[data-v]").forEach(el => {
     el.onclick = () => {
-      state.answers[state.i] = el.dataset.v || null;
-      if(state.i === QUESTIONS.length - 1){ state.view = "result"; renderResult(); }
-      else { state.i += 1; renderQuiz(); }
+      state.answers[state.pos] = el.dataset.v;
+      if (state.pos === QUESTIONS.length - 1){
+        clearSave();
+        state.view = "result";
+        renderResult();
+      } else {
+        state.pos += 1;
+        save();
+        renderQuiz();
+      }
     };
   });
   const back = document.getElementById("back");
-  if(back) back.onclick = () => { state.i -= 1; renderQuiz(); };
+  if (back) back.onclick = () => { state.pos -= 1; save(); renderQuiz(); };
 }
 
 function renderResult(){
-  const r = compute(state.answers);
+  const r = compute(records());
   const t = TYPES[r.code] || TYPES.ISTJ;
+  const elapsed = Math.round((Date.now() - state.startedAt) / 1000);
+
+  const bandText = {middle:"中间型", lean:"倾向型", clear:"明确型"};
   const bars = r.axes.map(a => `
     <div class="dim">
       <div class="label">
-        <span style="${a.pick===a.leftLetter?'font-weight:700':''}">${a.left} ${a.leftLetter} · ${a.leftPct}%</span>
-        <span style="${a.pick===a.rightLetter?'font-weight:700':''}">${a.rightPct}% · ${a.rightLetter} ${a.right}</span>
+        <span style="${a.pick === a.leftLetter ? "font-weight:700" : ""}">${a.left} ${a.leftLetter} · ${a.leftPct}%</span>
+        <span style="${a.pick === a.rightLetter ? "font-weight:700" : ""}">${a.rightPct}% · ${a.rightLetter} ${a.right}</span>
       </div>
       <div class="rail"><span class="l" style="width:${a.leftPct}%"></span><span class="r" style="width:${a.rightPct}%"></span></div>
-      <div class="desc">${a.desc}</div>
+      <div class="desc">${a.desc} · ${bandText[a.band]}</div>
     </div>`).join("");
 
-  const borderline = r.axes.filter(a => a.borderline);
-  const note = borderline.length
-    ? `<div class="note">${borderline.map(a => `${a.left}/${a.right}`).join("、")} 这${borderline.length>1?"几":"一"}个维度你的选择几乎对半（差距在 1 题以内），说明在这条线上比较灵活，结果仅供参考。</div>`
-    : (r.skipped > 5 ? `<div class="note">你跳过了 ${r.skipped} 题，结果可能不太稳定，建议重测一次。</div>` : "");
+  const middles = r.axes.filter(a => a.band === "middle");
+  const conf = {
+    high:  `<div class="note ok">作答质量良好：${QUESTIONS.length} 题中只跳过 ${r.stat.neutral} 题，答案分布也比较自然。</div>`,
+    medium: `<div class="note">提示：跳过 ${r.stat.neutral} 题${r.straight > 0.8 ? "，且选项集中在同一侧" : ""}，结果可能有偏差。</div>`,
+    low:   `<div class="note bad">可信度偏低：跳过 ${r.stat.neutral} 题${r.straight > 0.9 ? "，超过九成答案都在同一侧（可能没认真区分选项）" : ""}${elapsed < 60 ? `，全程只用了 ${elapsed} 秒` : ""}。建议重测一次。</div>`,
+  }[r.confidence];
+
+  const midNote = middles.length
+    ? `<div class="note">${middles.map(a => `${a.left}/${a.right}`).join("、")} 的差异不到 10%，属于<b>中间型</b>——这条线上你比较灵活，别把自己钉死在某一边。</div>`
+    : "";
 
   app.innerHTML = `
     <div class="card">
       <p class="muted" style="margin-bottom:2px">你的类型</p>
       <div class="type">${r.code}</div>
       <div class="type-name">${t.n} · ${t.s}</div>
-      ${note}
+      ${conf}${midNote}
       ${bars}
+
       <h2>你的优势</h2>
-      <ul class="list">${t.g.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      <ul class="list">${t.g.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+
+      <h2>别人容易误读你的地方</h2>
+      <p class="small">${esc(t.misread)}</p>
+
+      <h2>压力下的你</h2>
+      <p class="small">${esc(t.stress)}</p>
+
       <h2>可能的盲点</h2>
-      <ul class="list">${t.b.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      <ul class="list">${t.b.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+
       <h2>方向参考</h2>
-      <ul class="chips">${t.f.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      <ul class="chips">${t.c.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      <p class="muted small" style="margin-top:8px">这些方向对这类偏好更友好，但<b>类型不构成职业限制</b>，也不是招聘依据。</p>
+
+      <details class="adv">
+        <summary>进阶解读（认知功能栈）</summary>
+        <div class="inner">
+          <p><span class="stack">${t.stack}</span></p>
+          <p class="muted small">依次是你最惯用的四种心理功能：前两位最自然，第四位最不熟练、压力下最容易失衡。
+          MBTI 圈内常用它解释"为什么同类型的人也不一样"。</p>
+        </div>
+      </details>
+
       <div class="row">
         <button class="btn primary" id="again" style="flex:1">重新测试</button>
         <button class="btn" id="copy" style="flex:1;text-align:center">复制结果</button>
       </div>
       <div class="foot">
-        仅供自我探索，不是心理诊断。类型描述是“倾向”，不是“定义”——你可以不受它限制。<br>
-        已答 ${r.answered} / ${QUESTIONS.length} 题。
+        仅供自我探索，不是心理诊断。类型描述是"倾向"，不是"定义"——你可以不受它限制。<br>
+        共 ${QUESTIONS.length} 题 · 跳过 ${r.stat.neutral} 题 · 用时 ${elapsed} 秒
       </div>
     </div>`;
+
   document.getElementById("again").onclick = () => {
-    state.answers = new Array(QUESTIONS.length).fill(null);
-    state.i = 0; state.view = "intro"; renderIntro();
+    clearSave();
+    state.order = buildOrder();
+    state.pos = 0; state.answers = []; state.startedAt = Date.now();
+    state.view = "intro"; renderIntro();
   };
   document.getElementById("copy").onclick = async () => {
     const text = `我的 MBTI 类型：${r.code}（${t.n}）\n` +
-      r.axes.map(a => `${a.left}/${a.right}：${a.leftPct}% / ${a.rightPct}%`).join("\n") +
+      r.axes.map(a => `${a.left}/${a.right}：${a.leftPct}% / ${a.rightPct}%（${bandText[a.band]}）`).join("\n") +
       `\n—— MBTI 人格小测试`;
-    try { await navigator.clipboard.writeText(text); document.getElementById("copy").textContent = "已复制"; }
-    catch(e){ window.prompt("长按复制：", text); }
+    const btn = document.getElementById("copy");
+    try { await navigator.clipboard.writeText(text); btn.textContent = "已复制"; }
+    catch (e) { window.prompt("长按复制：", text); }
   };
 }
 
-/* 便于在 Node 里做逻辑测试 / 截图预览 */
-if (typeof window !== "undefined") {
-  window.__MBTI = { QUESTIONS, TYPES, DIMS, compute, renderIntro, renderQuiz, renderResult, state };
+/* 便于 Node 测试 / 截图预览 */
+if (typeof window !== "undefined"){
+  window.__MBTI = { QUESTIONS, TYPES, DIMS, compute, buildOrder, renderIntro, renderQuiz, renderResult, state, SAVE_KEY };
 }
 renderIntro();
 </script>
